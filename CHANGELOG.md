@@ -27,6 +27,10 @@ A correctness, safety and honesty overhaul after a full code review.
   no longer aborts on `✓`/IPA glyphs under legacy GBK/cp936 code pages.
 
 ### Added
+- **`--open` deep link** — after saving, jump straight to the card in Obsidian
+  (via `obsidian://open`, configured with `--vault-root/--vault-name` or the
+  `VOCAB_OBSIDIAN_ROOT`/`VOCAB_OBSIDIAN_VAULT` env vars). Pairs with Listary
+  custom commands for a zero-terminal workflow; documented in README.
 - **Related Forms as Wiki Links** (`educate` → `[[education]]`, `[[educator]]`) —
   previously advertised in the README but never implemented. Toggle with
   `--no-related`.

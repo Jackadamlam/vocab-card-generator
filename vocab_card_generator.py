@@ -30,8 +30,11 @@ from __future__ import annotations
 import argparse
 import difflib
 import json
+import os
 import re
+import subprocess
 import sys
+import urllib.parse
 from datetime import datetime
 from pathlib import Path
 
@@ -283,10 +286,33 @@ def merge_manual_into_generated(generated_md: str, old_md: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Obsidian deep-link helper (pure + testable)
+# ---------------------------------------------------------------------------
+def build_obsidian_uri(abs_md_path, vault_root, vault_name):
+    """Return an ``obsidian://open`` URI for a card, or None if not resolvable.
+
+    The ``file`` parameter is the note path relative to the vault root, without
+    the ``.md`` extension, using forward slashes. Returns ``None`` when either
+    the vault info is missing or the file lives outside the vault.
+    """
+    if not vault_root or not vault_name:
+        return None
+    try:
+        rel = Path(abs_md_path).resolve().with_suffix('').relative_to(
+            Path(vault_root).resolve())
+    except (ValueError, OSError):
+        return None
+    quote = urllib.parse.quote
+    return (f"obsidian://open?vault={quote(str(vault_name))}"
+            f"&file={quote(rel.as_posix())}")
+
+
+# ---------------------------------------------------------------------------
 # Generator
 # ---------------------------------------------------------------------------
 class VocabCardGenerator:
-    def __init__(self, output_dir=None, overwrite='skip', include_related=True):
+    def __init__(self, output_dir=None, overwrite='skip', include_related=True,
+                 vault_root=None, vault_name=None):
         if output_dir is None:
             output_dir = str(Path(__file__).parent)
         self.output_dir = Path(output_dir)
@@ -294,6 +320,8 @@ class VocabCardGenerator:
         self.api_url = "https://api.dictionaryapi.dev/api/v2/entries/en"
         self.overwrite = overwrite          # 'skip' | 'force' | 'merge'
         self.include_related = include_related
+        self.vault_root = vault_root or os.environ.get('VOCAB_OBSIDIAN_ROOT')
+        self.vault_name = vault_name or os.environ.get('VOCAB_OBSIDIAN_VAULT')
         self.created_cards: set[str] = set()
         self._cache: dict[str, object] = {}
         self.timeout = 6                  # seconds per request; API is free/slow
@@ -736,6 +764,21 @@ class VocabCardGenerator:
             print(f"  💡 Did you mean: {', '.join(matches)}?")
         return matches
 
+    def open_file(self, filepath):
+        """Jump to a saved card: Obsidian deep link if configured, else OS default."""
+        uri = build_obsidian_uri(filepath, self.vault_root, self.vault_name)
+        target = uri or str(Path(filepath).resolve())
+        try:
+            if sys.platform.startswith('win'):
+                os.startfile(target)  # noqa: S606 - opens registered handler
+            elif sys.platform == 'darwin':
+                subprocess.run(['open', target], check=False)
+            else:
+                subprocess.run(['xdg-open', target], check=False)
+            print(f"  ↗ Opened in Obsidian: {Path(filepath).name}")
+        except OSError as exc:
+            print(f"  ! Could not auto-open ({exc}). Path: {filepath}")
+
     # -- orchestration ----------------------------------------------------
     def create_card(self, word, tags=None):
         word = word.strip()
@@ -794,6 +837,12 @@ def main(argv=None):
     group.add_argument("--merge", action="store_true",
                        help="Regenerate dictionary fields but keep manual 'My examples' and '中文释义'")
     parser.add_argument("--no-related", action="store_true", help="Skip related-form Wiki Link discovery")
+    parser.add_argument("--open", dest="open_card", action="store_true",
+                        help="After saving, jump to the card (Obsidian deep link if configured)")
+    parser.add_argument("--vault-root", default=None,
+                        help="Vault root folder, used with --open (or env VOCAB_OBSIDIAN_ROOT)")
+    parser.add_argument("--vault-name", default=None,
+                        help="Vault display name, used with --open (or env VOCAB_OBSIDIAN_VAULT)")
 
     args = parser.parse_args(argv)
 
@@ -812,11 +861,14 @@ def main(argv=None):
     output = args.output or str(Path(__file__).parent)
 
     generator = VocabCardGenerator(output_dir=output, overwrite=overwrite,
-                                   include_related=not args.no_related)
+                                   include_related=not args.no_related,
+                                   vault_root=args.vault_root, vault_name=args.vault_name)
     filepath = generator.create_card(word=word, tags=args.tags)
 
     if filepath:
         print(f"\nDone! Card at: {filepath}")
+        if args.open_card:
+            generator.open_file(filepath)
     else:
         print("\nFailed to create vocabulary card.")
         sys.exit(1)

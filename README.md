@@ -94,7 +94,35 @@ vocab embed --no-related
 | `--force` | Overwrite an existing card |
 | `--merge` | Regenerate dictionary fields, preserve manual sections |
 | `--no-related` | Disable related-form Wiki Link discovery |
+| `--open` | After saving, jump straight to the card in Obsidian |
+| `--vault-root / --vault-name` | Vault location/name used by `--open` (or env `VOCAB_OBSIDIAN_ROOT` / `VOCAB_OBSIDIAN_VAULT`) |
 | `-h, --help` | Show help |
+
+## Zero-terminal workflow (Listary) ⭐
+
+If you use [Listary](https://www.listary.com/), you can generate a card and open
+it in Obsidian without ever touching a terminal: double-tap `Ctrl`, type
+`vocab <word>`, hit Enter.
+
+Create a custom command in **Listary Options → Commands → Add**:
+
+| Field | Value |
+| --- | --- |
+| Keyword | `vocab` |
+| Name | Generate vocab card |
+| Program | Full path to `pythonw.exe` (console-less Python) |
+| Arguments | `"D:\path\to\EN_Words\vocab_card_generator.py" {query} --open --vault-root "D:\path\to\Vault" --vault-name "Vault name"` |
+| Working directory | The `EN_Words` folder |
+| ☑ Silent | Run in the background, no window flash |
+
+Then:
+
+- `vocab embed` → creates `embed.md` and Obsidian jumps right to it.
+- `vocab embedded` → resolves the base form, links `base_form: embed`.
+- Works on existing cards too — `vocab host` opens your current `host.md` untouched.
+
+(No Listary? The same flags work from any launcher — PowerToys Run, AutoHotkey,
+a scheduled task, or plain `vocab embed --open` in a terminal.)
 
 ## Card structure / 卡片结构
 

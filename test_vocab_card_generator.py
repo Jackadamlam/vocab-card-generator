@@ -137,5 +137,27 @@ class TestFormGenerationStubbed(unittest.TestCase):
         self.assertIn("plural: hosts", md)  # YAML field present
 
 
+class TestObsidianUri(unittest.TestCase):
+    def test_relative_path_and_encoding(self):
+        root = Path(tempfile.mkdtemp())
+        card = (root / "EN_Learning" / "EN_Words" / "embed.md")
+        card.parent.mkdir(parents=True)
+        card.write_text("---\nword: embed\n---\n", encoding="utf-8")
+        uri = v.build_obsidian_uri(card, root, "My Vault")
+        self.assertTrue(uri.startswith("obsidian://open?vault=My%20Vault&file="))
+        self.assertIn("EN_Learning/EN_Words/embed", uri)
+        self.assertNotIn(".md", uri.split("file=", 1)[1])
+
+    def test_returns_none_without_vault_info(self):
+        self.assertIsNone(v.build_obsidian_uri("/tmp/x.md", None, "V"))
+        self.assertIsNone(v.build_obsidian_uri("/tmp/x.md", "/tmp", None))
+
+    def test_returns_none_when_outside_vault(self):
+        root = Path(tempfile.mkdtemp())
+        outside = Path(tempfile.mkdtemp()) / "elsewhere.md"
+        outside.write_text("x", encoding="utf-8")
+        self.assertIsNone(v.build_obsidian_uri(outside, root, "Vault"))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
