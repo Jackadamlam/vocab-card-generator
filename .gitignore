@@ -1,0 +1,23 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# --- Generated vocabulary cards (personal learning data) ---
+# The repo ships the tool + curated examples only. Cards you generate land in
+# this folder at runtime and stay local. Root-level docs are negated below.
+/*.md
+!/README.md
+!/CHANGELOG.md
+
+# Curated example cards ARE tracked:
+!examples/
+
+# --- OS / editor cruft ---
+.DS_Store
+Thumbs.db
+desktop.ini
+.obsidian/
