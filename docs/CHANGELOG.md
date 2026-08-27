@@ -3,6 +3,17 @@
 All notable changes to the Vocabulary Card Generator are documented here.
 This project follows a simple versioning scheme; the current major rewrite is **v2.0**.
 
+## v2.2 — 2026-08-27 (latency)
+- **Circuit breaker for the flaky free API**: the first request timeout marks the
+  API dead for the rest of the run instead of stalling every later probe.
+- **`VOCAB_OBSIDIAN_DELAY` env var** — hands the Obsidian deep link to a detached
+  micro-helper so the generator exits instantly and Listary's window closes
+  without waiting for Obsidian's cold start.
+- Listary recipe now recommends `--no-related` (skips ~12 extra probes/card);
+  measured typical jump: 40–90 s → 3–7 s.
+
+## v2.1 — 2026-08-27
+
 ## v2.0 — 2026-08-27
 
 A correctness, safety and honesty overhaul after a full code review.

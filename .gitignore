@@ -8,13 +8,17 @@ env/
 
 # --- Generated vocabulary cards (personal learning data) ---
 # The repo ships the tool + curated examples only. Cards you generate land in
-# this folder at runtime and stay local. Root-level docs are negated below.
+# this folder at runtime and stay local.
 /*.md
 !/README.md
-!/CHANGELOG.md
+
+# Docs live in docs/ so Obsidian can ignore them; they ARE tracked:
+!docs/
+docs/**
 
 # Curated example cards ARE tracked:
 !examples/
+!examples/*.md
 
 # --- OS / editor cruft ---
 .DS_Store

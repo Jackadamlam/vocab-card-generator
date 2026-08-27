@@ -327,6 +327,7 @@ class VocabCardGenerator:
         self.timeout = 6                  # seconds per request; API is free/slow
         self.max_requests = 40            # hard safety budget per invocation
         self._request_count = 0
+        self._dead = False                # set once the API proves unreachable this run
 
     # -- network ----------------------------------------------------------
     def fetch_word_data(self, word):
@@ -334,7 +335,7 @@ class VocabCardGenerator:
         if key in self._cache:
             return self._cache[key]
         data = None
-        if requests is not None and self._request_count < self.max_requests:
+        if requests is not None and not self._dead and self._request_count < self.max_requests:
             self._request_count += 1
             try:
                 response = requests.get(f"{self.api_url}/{key}", timeout=self.timeout)
@@ -342,6 +343,11 @@ class VocabCardGenerator:
                     payload = response.json()
                     if isinstance(payload, list) and payload:
                         data = payload
+            except requests.exceptions.Timeout:
+                # The free API is stalling — stop burning time on it this run.
+                self._dead = True
+                print("  ! Dictionary API timed out; continuing offline for the rest of this run.")
+                data = None
             except (requests.exceptions.RequestException, ValueError):
                 data = None
         self._cache[key] = data
@@ -765,9 +771,26 @@ class VocabCardGenerator:
         return matches
 
     def open_file(self, filepath):
-        """Jump to a saved card: Obsidian deep link if configured, else OS default."""
+        """Jump to a saved card: Obsidian deep link if configured, else OS default.
+
+        Returns the URI/target that was launched (or None on failure). When
+        VOCAB_OBSIDIAN_DELAY is set (Listary integration), the launch happens in
+        a detached delayed process so this one can exit immediately and Listary
+        closes its window without waiting for Obsidian's slow cold start.
+        """
         uri = build_obsidian_uri(filepath, self.vault_root, self.vault_name)
         target = uri or str(Path(filepath).resolve())
+
+        delay_env = os.environ.get('VOCAB_OBSIDIAN_DELAY')
+        if delay_env and sys.platform.startswith('win'):
+            try:
+                delay_ms = max(0, int(delay_env))
+            except ValueError:
+                delay_ms = 0
+            if self._launch_detached(target, delay_ms):
+                print(f"  ↗ Opening {Path(filepath).name} in ~{delay_ms / 1000:.1f}s…")
+                return target
+
         try:
             if sys.platform.startswith('win'):
                 os.startfile(target)  # noqa: S606 - opens registered handler
@@ -778,6 +801,34 @@ class VocabCardGenerator:
             print(f"  ↗ Opened in Obsidian: {Path(filepath).name}")
         except OSError as exc:
             print(f"  ! Could not auto-open ({exc}). Path: {filepath}")
+            return None
+        return target
+
+    def _launch_detached(self, target, delay_ms):
+        """Spawn a hidden helper that opens `target` after `delay_ms`, then returns.
+
+        The helper runs pythonw.exe directly (no PowerShell cold start, which can
+        take ~1s on its own). It reuses this interpreter's own directory.
+        """
+        pydir = Path(sys.executable).parent
+        helper = pydir / 'pythonw.exe'
+        if not helper.exists():
+            helper = pydir / 'python.exe'
+        if not helper.exists():
+            return False
+        code = (f"import time;time.sleep({int(delay_ms) / 1000:.3f});"
+                f"import os;os.startfile({str(target)!r})")
+        try:
+            DETACHED_PROCESS = 0x00000008
+            CREATE_NO_WINDOW = 0x08000000
+            subprocess.Popen(
+                [str(helper), '-c', code],
+                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL, creationflags=DETACHED_PROCESS | CREATE_NO_WINDOW,
+                close_fds=True)
+            return True
+        except OSError:
+            return False
 
     # -- orchestration ----------------------------------------------------
     def create_card(self, word, tags=None):

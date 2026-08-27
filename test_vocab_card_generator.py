@@ -7,6 +7,7 @@ stubbed ``fetch_word_data`` to drive morphology/related-form logic.
 Run with:  python -m unittest test_vocab_card_generator -v
 """
 
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -157,6 +158,41 @@ class TestObsidianUri(unittest.TestCase):
         outside = Path(tempfile.mkdtemp()) / "elsewhere.md"
         outside.write_text("x", encoding="utf-8")
         self.assertIsNone(v.build_obsidian_uri(outside, root, "Vault"))
+
+
+class TestDelayedOpen(unittest.TestCase):
+    """VOCAB_OBSIDIAN_DELAY must hand the launch to a detached helper and return fast."""
+
+    def setUp(self):
+        import unittest.mock as m
+        self._env = m.patch.dict(os.environ, {"VOCAB_OBSIDIAN_DELAY": "400"})
+        self._pop = m.patch.object(v.subprocess, "Popen")
+        self.env = self._env.start()
+        self.popen = self._pop.start()
+        self.addCleanup(lambda: (self._env.stop(), self._pop.stop()))
+
+    def test_delay_spawns_helper_and_skips_blocking_startfile(self):
+        import unittest.mock as m
+        gen = v.VocabCardGenerator(output_dir=tempfile.mkdtemp(),
+                                   vault_root=str(Path.cwd()), vault_name="Vault")
+        with m.patch.object(v.os, "startfile") as startfile:
+            target = gen.open_file(Path.cwd() / "embed.md")
+        self.assertIsNotNone(target)
+        self.assertEqual(self.popen.call_count, 1)
+        argv = self.popen.call_args[0][0]
+        self.assertTrue(argv[0].endswith("pythonw.exe"))
+        self.assertIn("time.sleep(0.400)", argv[2])
+        self.assertIn("obsidian://open", argv[2])
+        startfile.assert_not_called()  # nothing blocking in this process
+
+    def test_no_delay_uses_direct_startfile(self):
+        import unittest.mock as m
+        gen = v.VocabCardGenerator(output_dir=tempfile.mkdtemp(),
+                                   vault_root=str(Path.cwd()), vault_name="Vault")
+        with m.patch.dict(os.environ, {}, clear=True), m.patch.object(v.os, "startfile") as startfile:
+            gen.open_file(Path.cwd() / "embed.md")
+        self.assertEqual(self.popen.call_count, 0)
+        startfile.assert_called_once()
 
 
 if __name__ == "__main__":

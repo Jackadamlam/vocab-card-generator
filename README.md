@@ -111,7 +111,7 @@ Create a custom command in **Listary Options → Commands → Add**:
 | Keyword | `vocab` |
 | Name | Generate vocab card |
 | Program | Full path to `pythonw.exe` (console-less Python) |
-| Arguments | `"D:\path\to\EN_Words\vocab_card_generator.py" {query} --open --vault-root "D:\path\to\Vault" --vault-name "Vault name"` |
+| Arguments | `"D:\path\to\EN_Words\vocab_card_generator.py" {query} --open --no-related --vault-root "D:\path\to\Vault" --vault-name "Vault name"` |
 | Working directory | The `EN_Words` folder |
 | ☑ Silent | Run in the background, no window flash |
 
@@ -120,6 +120,17 @@ Then:
 - `vocab embed` → creates `embed.md` and Obsidian jumps right to it.
 - `vocab embedded` → resolves the base form, links `base_form: embed`.
 - Works on existing cards too — `vocab host` opens your current `host.md` untouched.
+
+### Why those two flags make it feel instant
+
+- **`--no-related`** — Related-Forms discovery fires up to ~12 extra dictionary
+  probes per card. On the free API's bad minutes that alone can add tens of
+  seconds. For a quick lookup the jump-to-note matters more than the links; run
+  `vocab <word> --force` from a terminal later if you want the full treatment.
+- **`VOCAB_OBSIDIAN_DELAY`** (optional env var, e.g. `400`) — when set, the
+  deep link is launched by a detached micro-helper after that many milliseconds,
+  so the generator exits immediately and Listary closes its window without
+  waiting for Obsidian's cold start.
 
 (No Listary? The same flags work from any launcher — PowerToys Run, AutoHotkey,
 a scheduled task, or plain `vocab embed --open` in a terminal.)
@@ -172,6 +183,7 @@ setup_vocab.ps1              # one-time PATH + dependency check
 requirements.txt             # Python dependencies
 test_vocab_card_generator.py # offline unit tests (no network)
 examples/                    # sample generated cards
+docs/                        # changelog & notes (kept out of Obsidian's index)
 ```
 
 ## Tests / 测试
